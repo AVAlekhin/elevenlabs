@@ -1,8 +1,16 @@
 "use client"
 
 import * as React from "react";
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import {Conversation} from "@11labs/client";
+
+declare global {
+    interface Window {
+        Telegram?: {
+            WebApp?: any;
+        }
+    }
+}
 
 async function requestMicrophonePermission() {
     try {
@@ -28,6 +36,37 @@ export default function ConvAI() {
     const [isConnected, setIsConnected] = useState(false)
     const [isSpeaking, setIsSpeaking] = useState(false)
     const [status, setStatus] = useState('Нажмите для начала разговора')
+    const [mounted, setMounted] = useState(false)
+
+    // Инициализация после монтирования компонента
+    useEffect(() => {
+        setMounted(true);
+        
+        if (window.Telegram?.WebApp) {
+            const tg = window.Telegram.WebApp;
+            
+            // Расширяем на весь экран
+            tg.expand();
+            
+            // Готовность приложения
+            tg.ready();
+
+            // Устанавливаем основной цвет кнопки из темы Telegram
+            const mainButtonColor = tg.themeParams?.button_color || '#34d399';
+            document.documentElement.style.setProperty('--main-button-color', mainButtonColor);
+        }
+
+        return () => {
+            if (conversation) {
+                conversation.endSession();
+            }
+        };
+    }, []);
+
+    // Не рендерим ничего до монтирования компонента
+    if (!mounted) {
+        return null;
+    }
 
     async function startConversation() {
         const hasPermission = await requestMicrophonePermission()
@@ -89,33 +128,67 @@ export default function ConvAI() {
     }
 
     return (
-        <div className="flex flex-col items-center gap-6">
-            <button
-                onClick={toggleConversation}
-                className={`
-                    w-48 h-48 
-                    rounded-full 
-                    flex items-center justify-center 
-                    transition-all duration-300 ease-in-out
-                    shadow-lg hover:shadow-xl
-                    ${isConnected 
-                        ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                        : 'bg-blue-500 hover:bg-blue-600'
-                    }
-                `}
-            >
-                <svg 
-                    viewBox="0 0 24 24" 
-                    className="w-16 h-16 text-white"
-                    fill="currentColor"
+        <div className="flex flex-col items-center gap-8 min-h-screen py-8">
+            <div className="relative w-56 h-56">
+                {/* Фоновый градиент */}
+                <div 
+                    className={`
+                        absolute inset-0 
+                        rounded-full 
+                        animate-gradient
+                        ${isConnected ? 'animate-glow' : ''}
+                        blur-[1px]
+                    `}
+                />
+                
+                {/* Основная кнопка */}
+                <button
+                    onClick={toggleConversation}
+                    className={`
+                        absolute inset-[3px]
+                        rounded-full 
+                        flex items-center justify-center 
+                        transition-all duration-300 ease-in-out
+                        shadow-lg hover:shadow-xl
+                        backdrop-blur-md
+                        bg-white/90
+                        hover:bg-white/95
+                        ${isConnected ? 'animate-pulse-scale' : 'hover:scale-105'}
+                        group
+                    `}
                 >
-                    <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
-            </button>
+                    {/* Внутренний градиент */}
+                    <div 
+                        className={`
+                            absolute inset-0
+                            rounded-full
+                            animate-gradient
+                            opacity-10
+                            group-hover:opacity-20
+                            transition-opacity
+                        `}
+                    />
+                    
+                    {/* Иконка */}
+                    <svg 
+                        viewBox="0 0 24 24" 
+                        className={`
+                            relative
+                            w-24 h-24 
+                            ${isConnected ? 'text-red-500' : 'text-emerald-500'}
+                            transition-colors duration-300
+                            drop-shadow-md
+                        `}
+                        fill="currentColor"
+                    >
+                        <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+            </div>
             <div className="text-gray-600 text-lg font-medium">
                 {status}
             </div>
         </div>
-    )
+    );
 }
